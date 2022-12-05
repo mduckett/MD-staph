@@ -1,0 +1,139 @@
+---
+title: "seq_retrieve_RM"
+output: html_document
+date: "2022-11-02"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+Need to install bioconductor, cant really install bioconductor its a series of packages, we'll see how this pans out. 
+https://www.bioconductor.org/install/
+
+
+```{r}
+library(BiocManager)
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+BiocManager::install(version = "3.15")
+
+BiocManager::install(c("GenomicFeatures", "AnnotationDbi"))
+
+```
+
+
+Biostrings should be used to deal with sequence data. BiocMLite looks like it should be used to call the package but it cant.
+Memory efficient string containers, string matching algorithms, and other utilities, for fast manipulation of large biological sequences or sets of sequences.
+```{r}
+#cant use biocmanager to install this way, this script from staphopia github is out of date: source("https://bioconductor.org/biocLite.R"), use below
+
+#BiocManager::install(c("biocLite.R"))
+BiocManager::install(c("Biostrings"))
+biocLite("Biostrings")
+#biocLite can't be installed with current version of R, 4.2.1, "Warning: package ‘biocLite.R’ is not available for Bioconductor version '3.15'" call in devtools to use github functions
+
+
+#install.packages("devtools")
+library(devtools)
+```
+
+```{r}
+install_github("staphopia/staphopia-r/staphopia")
+library("staphopia")
+test_staphopia()
+#you have to load devtools to use install_github. not dependent on bioconductoR
+```
+
+
+```{r}
+library(staphopia)                     
+library(dplyr)
+library(ape)
+library(phangorn)
+library(phytools)
+TOKEN = "89188550ed237de98872092265d612bc6a1d7161"
+# just made this one, if it doesn't work I'll give you my old one
+#token has to be a string
+```
+amount of core genome is 878 genes. 95% strains share but this is not 95% of genome, so how do you get the rest of the amount of genes? need the rest of the genes in reference genome to divide presence absence data to get a distance legth. google says theres 7,411 in pangenome in SA reference genome https://www.pnas.org/doi/10.1073/pnas.1523199113.
+
+```{r}
+# useful function
+`%not in%` <- function (x, table) is.na(match(x, table, nomatch=NA_integer_))
+# This gets the annotation ids of the core genome
+core_index <- read.delim('nrd-gene-set.txt', sep = '\t', header=T)
+
+# This is the NRD sample from the staphopia paper
+#nice_sample <- read.delim('nrd-sample-set.txt', sep = '\t', header=T)
+#`samples` <- nice_sample$sample_id
+nice_sample <- read.delim('comparison100_distmatrix.csv', sep = ',', header=T) #comma separated w ,
+`samples` <- nice_sample$X 
+# This is where you change the "samples" variable to those 100 samples that are in the gene data and distance matrices that I sent you
+samples
+
+core_index
+```
+
+```{r}
+# This code block gets the sequence data in nexus format 
+t <- proc.time() # keeps track of elapsed time
+allg <- get_variant_gene_sequence(as.numeric(samples), annotation_ids = core_index$annotation_id) # gets the core genome sequences for the samples in a non-concatenated format
+print(proc.time()-t) # prints elapsed time
+
+allgmr <- subset(allg, sample_id != 'reference') # gets rid of the reference sequence
+gallgmr <- allgmr %>% group_by(sample_id) %>% mutate(fullseq  = paste0(sequence, collapse = '')) # concatenates the core genome sequences
+
+gallgmr <- gallgmr[!duplicated(gallgmr$sample_id),] # I think the previous step has duplicates of samples; this gets rid of any duplicates
+
+nexusdat <- list() # this is the data structure to store the sequences
+# this loop stores the sequences in the data structure in a way that is understandable by R to write in a nexus format
+
+for(j in 1:length(samples)){
+  nexusdat[[j]] <- strsplit(tolower(gallgmr$fullseq[j]), '')[[1]]
+}
+names(nexusdat) <- c(samples)# adds sample IDs to nexus data
+#filename <- paste(%FILENAME, '.nex', sep = '\t')
+staphv1_100 <- paste("staphv1_100", '.nex', sep = "")
+write.nexus.data(nexusdat, staphv1_100) # writes data to filename so you don't have to do this again
+print(proc.time()-t)
+```
+try to isolate reference genome. concatenate, and count length of that. Would probably maybe count the 1s for each strain for how many genes present in genome and divide by genome length of reference genome? don't neeed genome length then because that value would kind of be nothing. That still doesn't count distance or similarity so thats not what I need. genome length? still need that for the distance value though, so still get that. for accessory, presence absence, who's here. Can I remove core genes from df and see whats left? continue to remove reference and concatenate. follow script to make distance matrix. This isn't the same as 1-core, because each strain will have various accessory left over when you remove the core. I can removecore and accessory will be left, but lengths will be different, so reference genome probably can't work either, because core length was calculated with core distance, I need to calculate accessory distance. so hopefully that matrix already encodes a calculation of length  to get value? I don't think it does.
+
+make csv for sample_idXsequence and one just with all metadata included
+```{r}
+library(readr)
+write_csv(gallgmr,"sample_seq_100_meta.csv")
+#making a csv that includes metadata in case I want that form
+
+#making a csv that's just sample ID and sequence info. Subset into its own df and as csv. Should be used to make a fasta. Should be path for the rfile used in poppunk, so PP can recognize sequence and sample ID from location. Already concatenated.
+library(dplyr)
+SSdf <- gallgmr %>%
+  select(sample_id, sequence)
+head(SSdf)
+write_csv(SSdf,"sample_seq_100_NOmeta.csv")
+```
+
+
+```{r}
+#Now we want to convert these sequences into phyDat format so that we can make a distance matrix
+nexusdatphydat <- nexusdat
+t <- proc.time()
+fbin <- as.DNAbin(nexusdatphydat) # converts the nexus format into DNAbin format (compressed losslessly)
+names(fbin) <- samples # names the data properly
+write.dna(x = fbin, file = paste("staphv1_100_phy", '.dnabin', sep = '')) #writes the DNAbin data to file
+staphv1_100_fbinphydat <- as.phyDat(fbin) # converts DNAbin data to phyDat data (which is easier to work with)
+print(proc.time()-t)
+```
+
+```{r}
+t <- proc.time()
+distobj <- dist.dna(fbin, model = %MODEL) # creates distance matrix for samples based on the molecular evolution model %MODEL
+# you can try playing around with different options for %MODEL to see how much of a difference it makes
+fdistmat <- as.matrix(distobj) # turns the "dist" object distobj into a matrix
+write.csv(x = fdistmat, file = paste(%FILENAME, '_fdistmat.csv', sep = '')) # writes distance matrix to file
+print(proc.time()-t)
+```
+
+#and there's the disance matrix
