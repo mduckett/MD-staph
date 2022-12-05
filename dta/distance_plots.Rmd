@@ -1,0 +1,289 @@
+---
+title: "weissman csv"
+output: html_document
+date: "2022-10-28"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+```{r}
+#this is the df that has column 100 that aishwarya fixed'
+setwd("/Users/marissaduckett/Downloads/weissman/staph/data/")
+getwd()
+binmatfull <- read.csv("binary_matrix.csv")
+
+head(binmatfull)
+
+#remove x and Gene column
+binmatfullnometa <- subset(binmatfull,select = -c(X))
+head(binmatfullnometa)
+
+#I already removed X from the df, this was to make gene column as rownames (aka 0 row/index row) and remove the column name Gene
+rownames(binmatfullnometa) <- binmatfullnometa$Gene 
+binmatfullnometa$Gene <- NULL
+binmatfullnometa$X9594 <- NULL
+
+head(binmatfullnometa)
+
+#can use this method for manhattan distance matrix which, in this case is the same as the hamming distance, but thats not always the case
+binmatdistmat <- dist(binmatfullnometa, method = "manhattan")
+#View(head(binmatdistmat,100))
+write.csv(binmatdistmat,"/Users/marissaduckett/Downloads/weissman/binmatdistmat.csv")
+
+tBMFM <- t(binmatfullnometa)
+head(tBMFM)
+
+setwd("/Users/marissaduckett/Downloads/weissman")
+
+library(cultevo)
+ham <- hammingdists(tBMFM)
+head.matrix(ham)
+ham
+write.csv(ham,"/Users/marissaduckett/Downloads/weissman/hamdistPA.csv")
+
+
+man <- dist(tBMFM, method = "manhattan")
+man
+write.csv(man,"/Users/marissaduckett/Downloads/weissman/mandistPA.csv")
+
+#yay manhattan and hamming agree!!!
+```
+
+Toy Matrix
+```{r}
+toy <- binmatfullnometa[c(1:10),c(1:10)]
+
+toy
+hamtoy <- hammingdists(toyt)
+hamtoy
+mantoy<- dist(toyt, method = "manhattan")
+mantoy
+toyt <- t(toy)
+toyt
+#prevBMDM <- binmatdistmat[c(1:5),c(1:5)]
+#prevBMDM this manhattan thing gives a straight line so, i dont think that can be very matrix-y
+```
+```{r}
+library(e1071)
+?hamming.distance
+hamming.distance(binmatfullnometa)
+```
+
+
+## Including Plots
+```{r}
+library(dplyr)
+binarymatrix <- read.csv('binary_matrix.csv')
+binarymatrix
+
+f <- function(x, levels) tabulate(factor(x, levels), length(levels))
+
+rowSums(apply(binarymatrix, 2L, f, c("0", "1"))) # if 'm' has more rows than columns
+#not helpful, doesnt tell you 0s and 1s per column
+
+
+out <- apply(binarymatrix, 1, function(x) count(x))
+out
+
+mat_num <- matrix(as.numeric(binarymatrix), ncol = ncol(binarymatrix))
+# Convert to numeric matrix
+mat_num  # Print numeric matrix
+
+mat_num <- lapply(binarymatrix, as.numeric)
+mat_num
+
+table(binarmatrixcopy$X1076)
+table(binarmatrixcopy$X119)
+table(binarmatrixcopy$X12152)
+table(binarmatrixcopy$X12207)
+
+
+```
+```{r}
+#still need to do this for column 100, this version has it excluded. This got the distance value for presence absence.
+
+
+#copy so we dont mess up original
+binarmatrixcopy <- binarymatrix
+
+#for ( in 1:ncol(binarmatrixcopy)) {
+#  print(i)
+#} 
+
+#this removes the metadata (X and gene) so that the results arent so long
+df2binarmatrixcopy <- subset(binarmatrixcopy,select = -c(X, Gene, X9594))
+head(df2binarmatrixcopy)
+
+#just double checking starter dta                   head(binarmatrixcopy)
+
+#Define  new data frame, loop through making a table with table function, this binds them together and names the columns. 
+matcount = data.frame()
+for (i in colnames(df2binarmatrixcopy)){ #the colnames in the dataset with the removed metadata
+  output = print(table(df2binarmatrixcopy[[i]]))
+  matcount = rbind(matcount, output) #binds printed output together with new df. 
+}
+colnames(matcount)<-c("No", "Yes") #adds colnames
+
+#I added a totals column to get the length of pangenome
+##Need to double check pangenome length!!!!!!
+matcount2 <- matcount %>% 
+  mutate(Total = No + Yes)
+matcount2
+
+#This creates the distance value column
+matdistvalue <- matcount2 %>%
+  mutate(dist = Yes/Total)
+matdistvalue
+
+#get strains from row and flipit to a colum then merge that to the matdistvalue df.
+
+strains <- colnames(df2binarmatrixcopy)
+rownames(mdv2) <- strains
+strainsA = df2binarmatrixcopy[0]
+
+strains2 <- row.names(strains)
+tibble::rownames_to_column(strains, ) # Apply rownames_to_column
+head(strains2)
+
+wstrainsPA <- cbind(mdv2, strainsA)
+mdv2$strains <- strains
+
+strains2 <- reshape(strains, idvar = "strains", direction = "long")
+w_strainnames <- w_strainnames %>%
+  add_column(strains = strains)
+strains2 <- strains %>%
+  pivot_longer(cols = 1:99 , names_to = "strains", values_to = "nada"
+  )
+strains2
+onecolumn <- data.frame(x=unlist(strains[ , 1:99]))
+onecolumn <- strains %>% gather(strain, , X1053:X9453)
+head(onecolumn, 24)
+
+write.csv(strains, "/Users/marissaduckett/Downloads/weissman/strains4columns.csv")
+write.csv(matdistvalue,"/Users/marissaduckett/Downloads/weissman/PA_Yes_Ct.csv")
+
+mdv2 <- matdistvalue
+
+hist(matdistvalue$dist)
+#smaller number smaller presence of genes investigated. abt 80% of these genes had a distance of .08. this plot represents the 1s quantified and divided by the total referenec genome from aishwaryas presence absence plot y of chart was all the genes identified, x (columns) were strains. 
+
+#match two vectors, match gives you the fist vector and the second vector match as an index.
+```
+
+
+
+This has 29,720 rows, so 29,720 rows genes in pangenome? I think this is the value I should use for accessory genome length
+```{r}
+presenceabsence <- read.csv("presence_absence.csv")
+head(presenceabsence)
+summary(presenceabsence)
+
+presenceabsence
+```
+
+
+```{r pressure, echo=FALSE}
+distmatrix_AG <- read.csv("dist_matrix.csv")
+head(distmatrix_AG)
+#summary(distmatrix_AG)
+
+#Aishwarya distance matrix looks to be the same as rohans. The 0s are complete similarity and the most dissimilar is 1. values are determined by similarity score aka distance divided by core genome length. There are 100 strains analyzed. Number of nucleotide difference/sequence length of core genome.
+```
+
+```{r}
+setwd("/Users/marissaduckett/Downloads/weissman/MD-staph/dta")
+c100_distmatrix_RM <- read.csv("pairwisecomparison_core100_distmatrix_RM.csv")
+head(c100_distmatrix_RM)
+summary(c100_distmatrix_RM)
+c100_distmatrix_RM
+
+c99_distmatrix_RM <- subset(c100_distmatrix_RM,select = -c(X9594))
+c99_distmatrix_RM
+
+man
+
+library(reshape2)
+manmelt <- as.matrix(man) #make man a matrix bc its a dist value
+manmelt <- melt(manmelt) #melt it togethr
+head(manmelt) #row columns then value of the two
+
+
+rownames(c99_distmatrix_RM) <- c99_distmatrix_RM$X 
+c99_distmatrix_RM$X <- NULL
+c99melt <- as.matrix(c99_distmatrix_RM)
+c99melt <- melt(c99melt)
+head(c99melt)
+
+#operation dist, doesnt waste space, give you one dist for each pair. distance matrix had two distance, one for each pair
+
+head(c99_distmatrix_RM)
+
+mergedmanc <- merge(manmelt, c99melt, by = c("Var1", "Var2"))
+#error Warning: invalid factor level, NA generated with no table
+
+head(mergedmanc)
+
+#same names
+names(manmelt)
+names(c99melt)
+mergedmanc <- merge(manmelt, c99melt, by = c("Var1", "Var2"))
+head(mergedmanc)
+#we see that the variables are no all the same, cant merge stuff thats not the same
+
+manmelt$Var1 <- paste0("X",manmelt$Var1) #turn them into characters
+manmelt$Var2 <- as.character(manmelt$Var2)
+#we accidentally added a second X, need o get rid of it library(stringr)
+
+c99melt$Var1 <- paste0("X",c99melt$Var1) #turn them into characters tomelt
+c99melt$Var2 <- as.character(c99melt$Var2)
+
+manmelt$Var1 <- str_replace(manmelt$Var1, "XX", "X")
+
+mergedmanc <- merge(manmelt, c99melt, by = c("Var1", "Var2"))
+#rename X and Y so you don't get confused
+
+names(mergedmanc) <- c("Strain1", "strain2", "PA_distance", "dist_mat_value")
+head(mergedmanc) #1053 compared to everything else
+
+library(ggplot2)
+ggplot(mergedmanc, aes(x = dist_mat_value, y = PA_distance)) +
+  geom_point()
+```
+
+```{r}
+plot(as.dist(man), as.dist(c99_distmatrix_RM))
+ham
+man
+
+library(factoextra)
+fviz_dist(man, lab_size = 4, 
+   gradient = list(low = "#00AFBB", mid = "white", high = "#FC4E07"))
+#only works on plotting things created from dist and dist.obj
+?fviz_dist
+?eclust
+eclust(man, FUNclustser = "hclust", hc_metric = "manhattan")
+#scatterplot of one distance vs the other first.
+```
+
+
+
+```{r}
+c100_PresAbs_RM <- read.csv("comparison100_pa_presenceabsence.csv")
+head(c100_PresAbs_RM)
+summary(c100_PresAbs_RM)
+#This one is just the df that needs to be parsed. metadata removed, and boolean loop added to change nothings to zeroes. ones are added to anything with a unique ID listed. a binary matrix can be made for ones and zeroes. You just need to transform the data to make a matrix.
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
